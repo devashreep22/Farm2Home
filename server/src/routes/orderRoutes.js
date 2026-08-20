@@ -1,22 +1,85 @@
 const express = require('express');
+
 const router = express.Router();
+
 const orderController = require('../controllers/orderController');
-const { protect, farmerOnly, adminOnly } = require('../middleware/auth');
-
-// Place order (buyer)
-router.post('/', protect, orderController.placeOrder);
-// Get my orders (buyer)
-router.get('/my', protect, orderController.getMyOrders);
-// Get orders for farmer's products
-router.get('/farmer', protect, farmerOnly, orderController.getFarmerOrders);
-// Admin: get all orders
-router.get('/all', protect, adminOnly, orderController.getAllOrders);
-
-// Get order details (buyer, farmer, admin)
 const orderDetailsController = require('../controllers/orderDetailsController');
-router.get('/:id', protect, orderDetailsController.getOrderById);
 
-// Update order status (admin/farmer)
-router.patch('/:id/status', protect, orderController.updateOrderStatus);
+const {
+  protect,
+  farmerOnly,
+  adminOnly
+} = require('../middleware/auth');
+
+
+// ===============================
+// BUYER
+// ===============================
+
+// Place order
+router.post(
+  '/',
+  protect,
+  orderController.placeOrder
+);
+
+// Get logged-in buyer's orders
+router.get(
+  '/my',
+  protect,
+  orderController.getMyOrders
+);
+
+
+// ===============================
+// FARMER
+// ===============================
+
+// Get orders containing farmer's products
+router.get(
+  '/farmer',
+  protect,
+  farmerOnly,
+  orderController.getFarmerOrders
+);
+
+
+// ===============================
+// ADMIN
+// ===============================
+
+// Get all orders
+router.get(
+  '/all',
+  protect,
+  adminOnly,
+  orderController.getAllOrders
+);
+
+
+// ===============================
+// ORDER DETAILS
+// ===============================
+
+// Buyer / farmer / admin can view appropriate orders
+router.get(
+  '/:id',
+  protect,
+  orderDetailsController.getOrderById
+);
+
+
+// ===============================
+// ORDER STATUS
+// ===============================
+
+// Admin can update order status
+router.patch(
+  '/:id/status',
+  protect,
+  adminOnly,
+  orderController.updateOrderStatus
+);
+
 
 module.exports = router;

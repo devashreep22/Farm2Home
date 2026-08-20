@@ -1,73 +1,175 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const connectDB = require('./config/db');
 const path = require('path');
 
-// Load env vars
-dotenv.config();
+const connectDB = require('./config/db');
 
-// Connect to MongoDB
-connectDB().then(() => console.log('DB connection established')).catch(err => console.error('DB connection error:', err));
+// Load environment variables FIRST
+dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// ======================================
+// DATABASE
+// ======================================
+
+connectDB()
+  .then(() => {
+    console.log('MongoDB connected successfully');
+  })
+  .catch((err) => {
+    console.error('MongoDB connection failed:', err.message);
+    process.exit(1);
+  });
+
+// ======================================
+// MIDDLEWARE
+// ======================================
+
+// CORS
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true
+  })
+);
+
+// Parse JSON
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Log every request with more details
+// Parse URL-encoded data
+app.use(express.urlencoded({ extended: true }));
+
+// ======================================
+// REQUEST LOGGER
+// ======================================
+
 app.use((req, res, next) => {
-	console.log(`\n[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-	console.log('Headers:', req.headers.authorization ? 'Auth token present' : 'No auth token');
-	next();
+  console.log(
+    `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`
+  );
+
+  if (req.headers.authorization) {
+    console.log('Auth token present');
+  } else {
+    console.log('No auth token');
+  }
+
+  next();
 });
 
-// Routes
-app.use('/api/v1/auth', require('./src/routes/authRoutes'));
-app.use('/api/v1/users', require('./src/routes/userRoutes'));
-app.use('/api/v1/products', require('./src/routes/productRoutes'));
-app.use('/api/v1/orders', require('./src/routes/orderRoutes'));
-app.use('/api/v1/admin', require('./src/routes/adminRoutes'));
-app.use('/api/v1/cart', require('./src/routes/cartRoutes'));
+// ======================================
+// STATIC FILES
+// ======================================
 
-console.log('\n=== Routes Mounted ===');
-console.log('Auth routes: /api/v1/auth');
-console.log('User routes: /api/v1/users');
-console.log('Product routes: /api/v1/products');
-console.log('Order routes: /api/v1/orders');
-console.log('Admin routes: /api/v1/admin');
-console.log('Cart routes: /api/v1/cart');
-console.log('=====================\n');
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'))
+);
 
-// Health check endpoint
+// ======================================
+// API ROUTES
+// ======================================
+
+app.use(
+  '/api/v1/auth',
+  require('./src/routes/authRoutes')
+);
+
+app.use(
+  '/api/v1/users',
+  require('./src/routes/userRoutes')
+);
+
+app.use(
+  '/api/v1/products',
+  require('./src/routes/productRoutes')
+);
+
+app.use(
+  '/api/v1/orders',
+  require('./src/routes/orderRoutes')
+);
+
+app.use(
+  '/api/v1/admin',
+  require('./src/routes/adminRoutes')
+);
+
+app.use(
+  '/api/v1/cart',
+  require('./src/routes/cartRoutes')
+);
+
+// ======================================
+// ROOT ROUTE
+// ======================================
+
+app.get('/', (req, res) => {
+  res.json({
+    status: true,
+    message: 'Farm2Home API is running',
+    version: 'v1'
+  });
+});
+
+// ======================================
+// HEALTH CHECK
+// ======================================
+
 app.get('/api/v1/health', (req, res) => {
-	console.log('Health check endpoint hit');
-	res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: true,
+    message: 'Farm2Home API is running',
+    timestamp: new Date().toISOString()
+  });
 });
 
-// 404 handler - must be AFTER all routes
-app.use((req, res, next) => {
-	console.error(`[404] Route not found: ${req.method} ${req.originalUrl}`);
-	res.status(404).json({ 
-		message: 'Route not found',
-		method: req.method,
-		path: req.originalUrl
-	});
+// ======================================
+// 404 HANDLER
+// ======================================
+
+app.use((req, res) => {
+  console.error(
+    `[404] ${req.method} ${req.originalUrl}`
+  );
+
+  res.status(404).json({
+    status: false,
+    message: 'Route not found',
+    method: req.method,
+    path: req.originalUrl
+  });
 });
 
-// Error handler
+// ======================================
+// ERROR HANDLER
+// ======================================
+
 app.use((err, req, res, next) => {
-	console.error('Error:', err);
-	require('./src/middleware/errorHandler')(err, req, res, next);
+  console.error('Server Error:', err);
+
+  res.status(err.status || 500).json({
+    status: false,
+    message: err.message || 'Server Error'
+  });
 });
 
-// Export the Express app so it can be reused by serverless wrappers (Vercel, Netlify, etc.)
+// ======================================
+// EXPORT APP
+// ======================================
+
 module.exports = app;
 
-// If this file is run directly (node server.js), start the HTTP server.
+// ======================================
+// START SERVER
+// ======================================
+
 if (require.main === module) {
-	const PORT = process.env.PORT || 5000;
-	app.listen(PORT, () => console.log(`Server running on port ${PORT} [${new Date().toLocaleString()}]`));
+  const PORT = process.env.PORT || 5000;
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
